@@ -1,0 +1,84 @@
+##Our working directory
+
+setwd("D:/STATISTICS/STATsolutions/STAT 52/Thesis/Airborne paper")
+
+#Load the packages
+library(readxl)
+library(corrplot)
+library(sp)
+library(sf)
+library(maps)
+library(spData)
+library(spdep)
+library(spatialreg)
+library(lmtest)
+
+#BD map from world map
+## make a df with only the country to overlap
+map_data_es <- map_data('world')[map_data('world')$region == "Bangladesh",]
+ggplot() +
+    ## First layer: worldwide map
+    geom_polygon(data = map_data("world"),
+                 aes(x=long, y=lat, group = group),
+                 color = '#9c9c9c', fill = '#f3f3f3') +
+    ## Second layer: Country map
+    geom_polygon(data = map_data_es,
+                 aes(x=long, y=lat, group = group),
+                 color = 'red', fill = 'pink') +
+    coord_map() +
+    coord_fixed(1.3,
+                xlim = c(86, 93),
+                ylim = c(21, 27.5)) +
+    ggtitle("A map of Bangladesh") +
+    theme(panel.background =element_rect(fill = 'blue'))
+
+#Incidence mapping
+spatial_data<-st_read("gadm40_BGD_2.shp")
+View(spatial_data)
+incidence_data<-read.csv(file.choose(),header=T)
+
+merged_data<-merge(spatial_data,incidence_data,by.x="NAME_2",by.y="NAME_2")
+View(merged_data)
+
+p1<-ggplot(data = merged_data) +
+  geom_sf(aes(fill = Meningococcal), color = "white") +
+  scale_fill_gradient(low = "lightblue", high = "darkblue", name = "Meningococcal cases") +
+  labs(title = "A1", subtitle = "") +
+  theme_minimal()+xlab("Longitude")+ylab("Latitude");p1
+
+
+#Spatial regression
+#Upload the transformed data
+data<-read_excel("Model.data.AHC.xlsx",sheet="spatial")
+
+#correlation matrix & plot
+cor1<-cor(data[c(12,5:11)])
+cor2<-cor(data[c(13,5:11)])
+cor3<-cor(data[c(14,5:11)])
+cor4<-cor(data[c(15,5:11)])
+cor5<-cor(data[c(16,5:11)])
+cor6<-cor(data[c(17,5:11)])
+cor1a<-cor(data[c(18,5:11)])
+
+corrplot(cor1a,method = "color",type="upper")
+
+# Our dataset is data
+coordinates(data) <- c("Longitude", "Latitude")
+proj4string(data) <- CRS("+proj=longlat +datum=WGS84")
+
+# Queen contiguity
+w <- dnearneigh(data, d1 = 0, d2 =0)  # Adjust the distance threshold (d2) as needed
+w <- nb2listw(w)
+
+model1 <- errorsarlm(y1~x1+x2+x3+x4+x5+x6+x7, data = data, listw = w)#d2=0
+coeftest(model1)
+summary(model1)
+
+model2 <- errorsarlm(y2~x2+x3+x4+x5, data = data, listw = w)
+coeftest(model2)
+
+model3 <- errorsarlm(y3~x1+x2, data = data, listw = w)#d2=0
+coeftest(model3)
+
+model4<-errorsarlm(y7~x1+x4+x5, data = data, listw = w)#d2=50
+coeftest(model4)
